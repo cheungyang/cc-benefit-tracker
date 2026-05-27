@@ -17,7 +17,7 @@ class TestSeed(unittest.TestCase):
             self.assertIn('capital one venture x', content)
             
             # Check for benefits count (at least 8)
-            benefit_inserts = re.findall(r"insert into benefits", content)
+            benefit_inserts = re.findall(r"insert into benefits", content, re.IGNORECASE)
             self.assertGreaterEqual(len(benefit_inserts), 8, "Should have at least 8 benefit entries")
 
     def test_frequencies(self):
@@ -27,21 +27,38 @@ class TestSeed(unittest.TestCase):
             self.assertIn("'monthly'", content)
             self.assertIn("'yearly'", content)
 
-    def test_categories(self):
-        allowed_categories = {'dining', 'travel', 'shopping', 'entertainment', 'wellness'}
+    def test_categories_and_uber_cash_spec(self):
         with open('seed.sql', 'r') as f:
-            content = f.read().lower()
-            # Find all categories in insert statements
-            # Pattern matches something like: 'Dining', 'monthly',
-            categories = re.findall(r"insert into benefits.*?values.*?'.*?',\s*.*?,.*?, '(.*?)',", content, re.DOTALL | re.IGNORECASE)
+            content = f.read()
             
-            # Since I used subqueries, the pattern might be different.
-            # SELECT id, 'Dining Credit', 10.00, 'Dining', 'monthly'
-            categories = re.findall(r"select.*?, '.*?', .*?, '(.*?)',", content, re.DOTALL | re.IGNORECASE)
+            # 1. Verify Uber Cash category is 'Dining/Travel'
+            uber_cash_entries = re.findall(r"SELECT.*?'Uber Cash',\s*[\d\.]+,\s*'(.*?)'", content, re.IGNORECASE)
+            self.assertGreater(len(uber_cash_entries), 0, "No Uber Cash entries found")
+            for cat in uber_cash_entries:
+                self.assertEqual(cat.strip(), 'Dining/Travel', f"Uber Cash category should be 'Dining/Travel', found '{cat}'")
+
+            # 2. Verify Amex Platinum Uber Cash description reflects the $35 bump
+            # We look for the statement that contains both 'Uber Cash', '$35 in Dec', and 'Amex Platinum'
+            # Each statement ends with a semicolon.
+            statements = content.split(';')
+            found_plat_uber = False
+            for stmt in statements:
+                if 'Uber Cash' in stmt and 'Amex Platinum' in stmt:
+                    found_plat_uber = True
+                    self.assertIn('$35 in Dec', stmt, "Amex Platinum Uber Cash description missing '$35 in Dec' bump info")
+            
+            self.assertTrue(found_plat_uber, "Could not find Amex Platinum Uber Cash SQL statement")
+
+    def test_general_categories(self):
+        allowed_categories = {'dining', 'travel', 'shopping', 'entertainment', 'wellness', 'dining/travel'}
+        with open('seed.sql', 'r') as f:
+            content = f.read()
+            # SELECT id, 'Benefit Name', amount, 'Category', 'Frequency'
+            categories = re.findall(r"SELECT.*?,\s*'.*?',\s*[\d\.]+,\s*'(.*?)',", content, re.IGNORECASE)
             
             for cat in categories:
-                cat = cat.strip().lower()
-                self.assertIn(cat, allowed_categories, f"Category '{cat}' is not in allowed categories")
+                cat_clean = cat.strip().lower()
+                self.assertIn(cat_clean, allowed_categories, f"Category '{cat_clean}' is not in allowed categories")
 
 if __name__ == '__main__':
     unittest.main()

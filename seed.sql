@@ -14,12 +14,12 @@ SELECT id, 'Dining Credit', 10.00, 'Dining', 'monthly', '$10 monthly dining cred
 FROM cards WHERE name = 'Amex Gold';
 
 INSERT INTO benefits (card_id, name, amount, category, frequency, description)
-SELECT id, 'Uber Cash', 10.00, 'Dining', 'monthly', '$10 monthly Uber Cash'
+SELECT id, 'Uber Cash', 10.00, 'Dining/Travel', 'monthly', '$10 monthly Uber Cash'
 FROM cards WHERE name = 'Amex Gold';
 
 -- Amex Platinum
 INSERT INTO benefits (card_id, name, amount, category, frequency, description)
-SELECT id, 'Uber Cash', 15.00, 'Dining', 'monthly', '$15 monthly Uber Cash ($35 in December)'
+SELECT id, 'Uber Cash', 15.00, 'Dining/Travel', 'monthly', '$15 monthly Uber Cash ($35 in Dec)'
 FROM cards WHERE name = 'Amex Platinum';
 
 INSERT INTO benefits (card_id, name, amount, category, frequency, description)
