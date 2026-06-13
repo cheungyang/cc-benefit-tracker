@@ -1,48 +1,59 @@
--- PostgreSQL Schema for CC Benefit Tracker
+-- PostgreSQL 15+ Schema for Credit Card Benefit Tracker
 
 -- Extensions
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Enums
-CREATE TYPE benefit_frequency AS ENUM ('monthly', 'quarterly', 'semiannually', 'yearly');
+-- 1. users
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
--- Tables
+-- Index for user email
+CREATE INDEX idx_users_email ON users(email);
 
--- 1. cards
+-- 2. issuers
+CREATE TABLE issuers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL
+);
+
+-- 3. cards
 CREATE TABLE cards (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    issuer VARCHAR(255) NOT NULL,
-    image_url TEXT
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    issuer_id UUID NOT NULL REFERENCES issuers(id) ON DELETE RESTRICT,
+    card_name VARCHAR(255) NOT NULL,
+    annual_fee DECIMAL(10, 2) DEFAULT 0.00,
+    renewal_date DATE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. user_cards
-CREATE TABLE user_cards (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    card_id UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE
-);
+-- Index for cards by user
+CREATE INDEX idx_cards_user ON cards(user_id);
 
--- 3. benefits
+-- 4. benefits
 CREATE TABLE benefits (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     card_id UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
-    amount DECIMAL(10, 2) NOT NULL,
-    category VARCHAR(100) NOT NULL,
-    frequency benefit_frequency NOT NULL,
-    description TEXT
+    total_value DECIMAL(10, 2) NOT NULL,
+    reset_cycle VARCHAR(50) NOT NULL, -- Enum: 'monthly', 'calendar_year', 'card_anniversary'
+    category VARCHAR(100) NOT NULL
 );
 
--- 4. claims
-CREATE TABLE claims (
+-- 5. benefit_usage
+CREATE TABLE benefit_usage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     benefit_id UUID NOT NULL REFERENCES benefits(id) ON DELETE CASCADE,
-    window_id VARCHAR(50) NOT NULL,
-    claimed_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (benefit_id, window_id)
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount_used DECIMAL(10, 2) NOT NULL,
+    transaction_date DATE NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Indices
-CREATE INDEX idx_benefits_card_id ON benefits(card_id);
-CREATE INDEX idx_user_cards_card_id ON user_cards(card_id);
-CREATE INDEX idx_claims_benefit_window ON claims(benefit_id, window_id);
+-- Index for fast balance calculation
+CREATE INDEX idx_usage_benefit_date ON benefit_usage(benefit_id, transaction_date);
